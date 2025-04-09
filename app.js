@@ -27,6 +27,74 @@ const SimpleBarChart = ({ data, dataKey, nameKey, height }) => {
   );
 };
 
+const SimplePieChart = ({ data, valueKey, nameKey, height }) => {
+  const total = data.reduce((sum, item) => sum + item[valueKey], 0);
+  const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042"];
+  
+  let currentAngle = 0;
+  
+  return (
+    <div style={{ height: height || 300, position: 'relative' }}>
+      <svg width="100%" height="100%" viewBox="0 0 300 300">
+        <g transform="translate(150, 150)">
+          {data.map((item, index) => {
+            const value = item[valueKey];
+            const percentage = (value / total) * 100;
+            const angle = (percentage / 100) * 360;
+            
+            // Calculate the SVG arc path
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + angle;
+            currentAngle = endAngle;
+            
+            const startRad = (startAngle - 90) * Math.PI / 180;
+            const endRad = (endAngle - 90) * Math.PI / 180;
+            
+            const x1 = 100 * Math.cos(startRad);
+            const y1 = 100 * Math.sin(startRad);
+            const x2 = 100 * Math.cos(endRad);
+            const y2 = 100 * Math.sin(endRad);
+            
+            const largeArcFlag = angle > 180 ? 1 : 0;
+            
+            const pathData = `M 0 0 L ${x1} ${y1} A 100 100 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+            
+            // Calculate text position
+            const midAngle = startAngle + angle / 2;
+            const midRad = (midAngle - 90) * Math.PI / 180;
+            const labelX = 70 * Math.cos(midRad);
+            const labelY = 70 * Math.sin(midRad);
+            
+            return (
+              <g key={index}>
+                <path d={pathData} fill={colors[index % colors.length]} />
+                <text
+                  x={labelX}
+                  y={labelY}
+                  textAnchor="middle"
+                  fill="white"
+                  fontSize="12"
+                  fontWeight="bold"
+                >
+                  {percentage.toFixed(0)}%
+                </text>
+              </g>
+            );
+          })}
+        </g>
+        <g transform="translate(150, 260)">
+          {data.map((item, index) => (
+            <g key={index} transform={`translate(${(index - data.length / 2) * 80}, 0)`}>
+              <rect width="16" height="16" fill={colors[index % colors.length]} />
+              <text x="20" y="12" fontSize="12">{item[nameKey]}: {item[valueKey]}%</text>
+            </g>
+          ))}
+        </g>
+      </svg>
+    </div>
+  );
+};
+
 const PeyzajApp = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [useSimpleCharts, setUseSimpleCharts] = useState(false);
@@ -92,13 +160,81 @@ const PeyzajApp = () => {
   };
 
   const formatPrice = price => price.toLocaleString('tr-TR');
+  
+  // Özet grafikleri için veri fonksiyonları
+  const getTotalChartData = () => {
+    return companies.map((company, index) => ({
+      name: company,
+      total: totals[index]
+    }));
+  };
+  
+  const getPieChartData = () => {
+    const bestCompanyCounts = companies.map(company => 
+      items.filter(item => item.bestCompany === company).length
+    );
+    const totalItems = items.length;
+    return companies.map((company, index) => ({
+      name: company,
+      value: Math.round((bestCompanyCounts[index] / totalItems) * 100)
+    })).filter(item => item.value > 0);
+  };
+  
+  const renderTotalChart = () => {
+    if (useSimpleCharts) {
+      return <SimpleBarChart data={getTotalChartData()} dataKey="total" nameKey="name" />;
+    }
+    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
+    return (
+      <div style={{ width: '100%', height: 300 }}>
+        <ResponsiveContainer>
+          <BarChart data={getTotalChartData()}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip formatter={(value) => value.toLocaleString('tr-TR') + ' TL'} />
+            <Bar dataKey="total" fill="#4f46e5" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+  
+  const renderPieChart = () => {
+    if (useSimpleCharts) {
+      return <SimplePieChart data={getPieChartData()} valueKey="value" nameKey="name" />;
+    }
+    const { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } = Recharts;
+    const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042"];
+    return (
+      <div style={{ width: '100%', height: 300 }}>
+        <ResponsiveContainer>
+          <PieChart>
+            <Pie
+              data={getPieChartData()}
+              cx="50%"
+              cy="50%"
+              outerRadius={100}
+              label={({ name, value }) => `${name}: ${value}%`}
+              dataKey="value"
+            >
+              {getPieChartData().map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(value) => `${value}%`} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
 
   return (
     <div className="p-4 bg-white rounded shadow max-w-full">
       <h1 className="text-2xl font-bold mb-4 text-center">Peyzaj Firmaları Fiyat Karşılaştırması</h1>
 
-      {/* Sekmeler */}
-      <div className="mb-6 flex justify-center space-x-4">
+      {/* Sekmeler ve Yazdır Butonu */}
+      <div className="mb-6 flex flex-wrap gap-4 justify-center no-print">
         <button 
           className={`px-4 py-2 rounded ${activeTab === 'comparison' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
           onClick={() => setActiveTab('comparison')}
@@ -110,6 +246,12 @@ const PeyzajApp = () => {
           onClick={() => setActiveTab('summary')}
         >
           Özet
+        </button>
+        <button 
+          className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+          onClick={() => window.print()}
+        >
+          Yazdır / PDF Kaydet
         </button>
       </div>
 
@@ -171,8 +313,15 @@ const PeyzajApp = () => {
       )}
 
       {activeTab === 'summary' && (
-        <div className="bg-gray-100 p-6 rounded shadow text-center text-gray-500">
-          <p>Özet ekranı buraya eklenecek. Toplam fiyat grafiği, en uygun firma yüzdesi vs.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-4 rounded shadow">
+            <h2 className="text-lg font-semibold mb-4">Toplam Fiyat Karşılaştırması</h2>
+            {renderTotalChart()}
+          </div>
+          <div className="bg-white p-4 rounded shadow">
+            <h2 className="text-lg font-semibold mb-4">En Uygun Firma Yüzdeleri</h2>
+            {renderPieChart()}
+          </div>
         </div>
       )}
     </div>
