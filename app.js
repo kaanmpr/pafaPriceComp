@@ -30,6 +30,7 @@ const SimpleBarChart = ({ data, dataKey, nameKey, height }) => {
 const PeyzajApp = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [useSimpleCharts, setUseSimpleCharts] = useState(false);
+  const [activeTab, setActiveTab] = useState('comparison');
 
   useEffect(() => {
     if (typeof window.Recharts === 'undefined') {
@@ -93,52 +94,87 @@ const PeyzajApp = () => {
   const formatPrice = price => price.toLocaleString('tr-TR');
 
   return (
-    <div className="p-4 bg-white rounded shadow">
-      <h1 className="text-xl font-bold mb-4">Ürün Bazlı Fiyat Karşılaştırması</h1>
-      <div className="table-container">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="px-2 py-2">Ürün</th>
-              <th className="px-2 py-2">Açıklama</th>
-              <th className="px-2 py-2">Adet</th>
-              {companies.map((company, index) => (
-                <React.Fragment key={`${company}-head`}>
-                  <th className="px-2 py-2">{company} (TL)</th>
-                  <th className="px-2 py-2">Fark %</th>
-                  <th className="px-2 py-2">Toplam (TL)</th>
-                </React.Fragment>
-              ))}
-              <th className="px-2 py-2">En Uygun</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {getTableData().map((item, index) => (
-              <tr
-                key={index}
-                className="hover:bg-gray-100 cursor-pointer"
-                onClick={() => setSelectedItem(item.name)}
-              >
-                <td className="px-2 py-1">{item.name}</td>
-                <td className="px-2 py-1">{item.description}</td>
-                <td className="px-2 py-1">{item.quantity}</td>
-                {companies.map((company, i) => {
-                  const isMin = item.differences[i] === '0%';
-                  const isTotalMin = item.totalDifferences[i] === '0%';
-                  return (
-                    <React.Fragment key={`${item.name}-${company}`}>
-                      <td className={`px-2 py-1 ${isMin ? 'bg-green-100' : ''}`}>{item.prices[i]}</td>
-                      <td className={`px-2 py-1 ${isMin ? 'bg-green-100' : ''}`}>{item.differences[i]}</td>
-                      <td className={`px-2 py-1 ${isTotalMin ? 'bg-green-100' : ''}`}>{item.totalPrices[i]}</td>
-                    </React.Fragment>
-                  );
-                })}
-                <td className="px-2 py-1">{item.bestCompany}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="p-4 bg-white rounded shadow max-w-full">
+      <h1 className="text-2xl font-bold mb-4 text-center">Peyzaj Firmaları Fiyat Karşılaştırması</h1>
+
+      {/* Sekmeler */}
+      <div className="mb-6 flex justify-center space-x-4">
+        <button 
+          className={`px-4 py-2 rounded ${activeTab === 'comparison' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          onClick={() => setActiveTab('comparison')}
+        >
+          Ürün Karşılaştırma
+        </button>
+        <button 
+          className={`px-4 py-2 rounded ${activeTab === 'summary' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          onClick={() => setActiveTab('summary')}
+        >
+          Özet
+        </button>
       </div>
+
+      {activeTab === 'comparison' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <div className="table-container">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-2 py-2">Ürün</th>
+                    <th className="px-2 py-2">Açıklama</th>
+                    <th className="px-2 py-2">Adet</th>
+                    {companies.map((company, index) => (
+                      <React.Fragment key={`${company}-head`}>
+                        <th className="px-2 py-2">{company} (TL)</th>
+                        <th className="px-2 py-2">Fark %</th>
+                        <th className="px-2 py-2">Toplam (TL)</th>
+                      </React.Fragment>
+                    ))}
+                    <th className="px-2 py-2">En Uygun</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {getTableData().map((item, index) => (
+                    <tr
+                      key={index}
+                      className="hover:bg-gray-100 cursor-pointer"
+                      onClick={() => setSelectedItem(item.name)}
+                    >
+                      <td className="px-2 py-1">{item.name}</td>
+                      <td className="px-2 py-1">{item.description}</td>
+                      <td className="px-2 py-1">{item.quantity}</td>
+                      {companies.map((company, i) => {
+                        const isMin = item.differences[i] === '0%';
+                        const isTotalMin = item.totalDifferences[i] === '0%';
+                        return (
+                          <React.Fragment key={`${item.name}-${company}`}>
+                            <td className={`px-2 py-1 ${isMin ? 'bg-green-100' : ''}`}>{item.prices[i]}</td>
+                            <td className={`px-2 py-1 ${isMin ? 'bg-green-100' : ''}`}>{item.differences[i]}</td>
+                            <td className={`px-2 py-1 ${isTotalMin ? 'bg-green-100' : ''}`}>{item.totalPrices[i]}</td>
+                          </React.Fragment>
+                        );
+                      })}
+                      <td className="px-2 py-1">{item.bestCompany}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded shadow">
+            <h2 className="text-lg font-semibold mb-4">
+              {selectedItem ? `${selectedItem} Fiyat Karşılaştırması` : "Ürün Seçin"}
+            </h2>
+            {/* Seçilen ürün için grafik/detay yeri */}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'summary' && (
+        <div className="bg-gray-100 p-6 rounded shadow text-center text-gray-500">
+          <p>Özet ekranı buraya eklenecek. Toplam fiyat grafiği, en uygun firma yüzdesi vs.</p>
+        </div>
+      )}
     </div>
   );
 };
