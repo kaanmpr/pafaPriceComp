@@ -1,8 +1,11 @@
+// sw.js
 const CACHE_NAME = 'peyzaj-karsilastirma-v1';
 const urlsToCache = [
   './',
   './index.html',
   './manifest.json',
+  './auth.js',
+  './app.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js',
@@ -14,56 +17,43 @@ const urlsToCache = [
   './icon-512x512.png'
 ];
 
-// Önbelleğe alma aşaması
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Önbellek açıldı');
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_NAME).then(cache => {
+      console.log('Önbellek açıldı');
+      return cache.addAll(urlsToCache);
+    })
   );
 });
 
-// Önbelleği kullanma aşaması
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Önbellekte varsa, önbellekten döndür
-        if (response) {
-          return response;
+    caches.match(event.request).then(response => {
+      if (response) return response;
+
+      return fetch(event.request).then(networkResponse => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
         }
 
-        // Yoksa ağdan al
-        return fetch(event.request).then(
-          response => {
-            // Yanıt geçerli değilse, sadece yanıtı döndür
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
 
-            // Yanıtı önbelleğe ekle
-            let responseToCache = response.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-
-            return response;
-          }
-        );
-      })
+        return networkResponse;
+      });
+    })
   );
 });
 
-// Eski önbellekleri temizleme
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
+          if (!cacheWhitelist.includes(cacheName)) {
             return caches.delete(cacheName);
           }
         })
