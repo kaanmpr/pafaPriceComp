@@ -1,0 +1,201 @@
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#4a90e2" /> <!-- PWA için tema rengi -->
+  <link rel="manifest" href="manifest.json" /> <!-- manifest.json bağlantısı -->
+
+  <title>Peyzaj Firmaları Fiyat Karşılaştırması</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.1.16/Recharts.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.21.2/babel.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  
+  <style>
+    .password-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(255, 255, 255, 0.96);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .password-container {
+      background-color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      font-family: sans-serif;
+    }
+
+    .password-input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      margin-top: 1rem;
+      font-size: 16px;
+    }
+
+    .password-button {
+      background-color: #4f46e5;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      margin-top: 1rem;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      border: none;
+    }
+
+    .password-button:hover {
+      background-color: #4338ca;
+    }
+
+    .error-message {
+      color: #ef4444;
+      margin-top: 0.75rem;
+      font-size: 14px;
+    }
+
+    #logout-button {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9998;
+      display: none;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 5px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #logout-button:hover {
+      background: #4338ca;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 p-4">
+  <!-- Şifreli Giriş Ekranı -->
+  <div id="password-screen" class="password-screen">
+    <div class="password-container">
+      <h2 style="font-size: 1.5rem; font-weight: bold;">Peyzaj Karşılaştırma</h2>
+      <p class="mt-2">Kullanıcı adınızı girin:</p>
+      <input type="text" id="username-input" class="password-input" placeholder="kullanıcı adı" />
+
+      <p class="mt-4">E-posta ile gelen 6 haneli şifreyi girin:</p>
+      <input type="text" id="code-input" class="password-input" placeholder="6 haneli şifre" maxlength="6" />
+
+      <button id="request-code-button" class="password-button">Kod Gönder</button>
+      <button id="login-button" class="password-button">Giriş Yap</button>
+
+      <p id="error-message" class="error-message"></p>
+    </div>
+  </div>
+
+  <!-- Çıkış butonu -->
+  <button id="logout-button">Çıkış Yap</button>
+
+  <!-- Uygulama için yer -->
+  <div id="app"></div>
+  <script>
+    (() => {
+      const passwordScreen = document.getElementById('password-screen');
+      const usernameInput = document.getElementById('username-input');
+      const codeInput = document.getElementById('code-input');
+      const requestCodeBtn = document.getElementById('request-code-button');
+      const loginBtn = document.getElementById('login-button');
+      const errorMessage = document.getElementById('error-message');
+      const logoutBtn = document.getElementById('logout-button');
+  
+      const STORAGE_KEY = 'pafaPricePassword';
+  
+      // Zaten giriş yapılmışsa ekranı gizle
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        passwordScreen.style.display = 'none';
+        logoutBtn.style.display = 'inline-block';
+      } else {
+        logoutBtn.style.display = 'none';
+      }
+  
+      // Çıkış butonu
+      logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      });
+  
+      // Kod gönder butonu
+      requestCodeBtn.addEventListener('click', async () => {
+        const username = usernameInput.value.trim().toLowerCase();
+        if (!username) {
+          errorMessage.textContent = 'Kullanıcı adı boş olamaz.';
+          return;
+        }
+  
+        try {
+          const res = await fetch('https://amazon-proxy-server-backend-67c6fdfdccf7.herokuapp.com/api/request-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.message || 'Kod gönderilemedi.');
+          errorMessage.style.color = '#10b981';
+          errorMessage.textContent = '✔ Kod e-posta ile gönderildi!';
+        } catch (err) {
+          errorMessage.style.color = '#ef4444';
+          errorMessage.textContent = err.message;
+        }
+      });
+  
+      // Giriş yap butonu
+      loginBtn.addEventListener('click', async () => {
+        const username = usernameInput.value.trim().toLowerCase();
+        const code = codeInput.value.trim();
+        if (!username || !code) {
+          errorMessage.textContent = 'Kullanıcı adı ve şifre gerekli.';
+          return;
+        }
+  
+        try {
+          const res = await fetch('https://amazon-proxy-server-backend-67c6fdfdccf7.herokuapp.com/api/verify-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, code })
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.message || 'Giriş başarısız.');
+          localStorage.setItem(STORAGE_KEY, username);
+          passwordScreen.style.display = 'none';
+          logoutBtn.style.display = 'inline-block';
+        } catch (err) {
+          errorMessage.style.color = '#ef4444';
+          errorMessage.textContent = err.message;
+        }
+      });
+    })();
+  </script>
+  <!-- ✅ Service Worker Kaydı -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('✅ Service worker başarıyla kaydedildi:', reg))
+        .catch(err => console.warn('❌ Service worker kaydedilemedi:', err));
+    });
+  }
+</script>
