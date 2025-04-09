@@ -42,7 +42,6 @@ const SimplePieChart = ({ data, valueKey, nameKey, height }) => {
             const percentage = (value / total) * 100;
             const angle = (percentage / 100) * 360;
             
-            // Calculate the SVG arc path
             const startAngle = currentAngle;
             const endAngle = currentAngle + angle;
             currentAngle = endAngle;
@@ -59,7 +58,6 @@ const SimplePieChart = ({ data, valueKey, nameKey, height }) => {
             
             const pathData = `M 0 0 L ${x1} ${y1} A 100 100 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
             
-            // Calculate text position
             const midAngle = startAngle + angle / 2;
             const midRad = (midAngle - 90) * Math.PI / 180;
             const labelX = 70 * Math.cos(midRad);
@@ -96,6 +94,7 @@ const SimplePieChart = ({ data, valueKey, nameKey, height }) => {
 };
 
 const PeyzajApp = () => {
+  const [selectedItem, setSelectedItem] = useState(null);
   const [useSimpleCharts, setUseSimpleCharts] = useState(false);
   const [activeTab, setActiveTab] = useState('comparison');
 
@@ -159,7 +158,85 @@ const PeyzajApp = () => {
   };
 
   const formatPrice = price => price.toLocaleString('tr-TR');
-  
+
+  // Seçilen ürün için detaylı karşılaştırma paneli
+  const renderItemDetailPanel = () => {
+    if (!selectedItem) return null;
+    
+    const item = items.find(i => i.name === selectedItem);
+    if (!item) return null;
+    
+    const minPrice = Math.min(...item.prices.filter(p => p > 0));
+    const advList = companies.map((company, i) => {
+      const price = item.prices[i];
+      const diff = price === 0 ? "N/A" : `${Math.round((price - minPrice) / minPrice * 100)}%`;
+      const isMin = price === minPrice;
+      
+      return {
+        company,
+        price,
+        diff,
+        isMin,
+        advantage: isMin ? "En uygun fiyat" : (diff === "N/A" ? "Bilgi yok" : "")
+      };
+    });
+
+    const chartData = advList.map(adv => ({
+      name: adv.company,
+      value: adv.price
+    }));
+    
+    return (
+      <div className="bg-white p-4 rounded shadow mt-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">{item.name} Detaylı Fiyat Karşılaştırması</h2>
+          <button 
+            className="text-gray-500 hover:text-gray-700"
+            onClick={() => setSelectedItem(null)}
+          >
+            ✕
+          </button>
+        </div>
+        <p className="mb-4"><strong>Tanım:</strong> {item.description}, <strong>Adet:</strong> {item.quantity}</p>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full border divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left">Firma</th>
+                <th className="px-4 py-2 text-left">Birim Fiyat (TL)</th>
+                <th className="px-4 py-2 text-left">Fark %</th>
+                <th className="px-4 py-2 text-left">Toplam (TL)</th>
+                <th className="px-4 py-2 text-left">Avantaj</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {advList.map((adv, i) => (
+                <tr key={i} className={adv.isMin ? "bg-green-50" : ""}>
+                  <td className="px-4 py-2">{adv.company}</td>
+                  <td className="px-4 py-2">{adv.price.toLocaleString('tr-TR')}</td>
+                  <td className="px-4 py-2">{adv.diff}</td>
+                  <td className="px-4 py-2">{(adv.price * item.quantity).toLocaleString('tr-TR')}</td>
+                  <td className="px-4 py-2">{adv.advantage}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        <div className="mt-4">
+          <h3 className="font-semibold mb-2">Fiyat Grafiği</h3>
+          <SimpleBarChart 
+            data={chartData} 
+            dataKey="value" 
+            nameKey="name" 
+            height={200}
+          />
+        </div>
+      </div>
+    );
+  };
+
   // Özet grafikleri için veri fonksiyonları
   const getTotalChartData = () => {
     return companies.map((company, index) => ({
@@ -176,7 +253,7 @@ const PeyzajApp = () => {
     return companies.map((company, index) => ({
       name: company,
       value: Math.round((bestCompanyCounts[index] / totalItems) * 100)
-    })).filter(item => item.value > 0);
+    })).filter(item => item.value > ാന);
   };
   
   const renderTotalChart = () => {
@@ -255,49 +332,53 @@ const PeyzajApp = () => {
       </div>
 
       {activeTab === 'comparison' && (
-        <div className="table-container">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-2 py-2">Ürün</th>
-                <th className="px-2 py-2">Açıklama</th>
-                <th className="px-2 py-2">Adet</th>
-                {companies.map((company, index) => (
-                  <React.Fragment key={`${company}-head`}>
-                    <th className="px-2 py-2">{company} (TL)</th>
-                    <th className="px-2 py-2">Fark %</th>
-                    <th className="px-2 py-2">Toplam (TL)</th>
-                  </React.Fragment>
-                ))}
-                <th className="px-2 py-2">En Uygun</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {getTableData().map((item, index) => (
-                <tr
-                  key={index}
-                  className="hover:bg-gray-100"
-                >
-                  <td className="px-2 py-1">{item.name}</td>
-                  <td className="px-2 py-1">{item.description}</td>
-                  <td className="px-2 py-1">{item.quantity}</td>
-                  {companies.map((company, i) => {
-                    const isMin = item.differences[i] === '0%';
-                    const isTotalMin = item.totalDifferences[i] === '0%';
-                    return (
-                      <React.Fragment key={`${item.name}-${company}`}>
-                        <td className={`px-2 py-1 ${isMin ? 'bg-green-100' : ''}`}>{item.prices[i]}</td>
-                        <td className={`px-2 py-1 ${isMin ? 'bg-green-100' : ''}`}>{item.differences[i]}</td>
-                        <td className={`px-2 py-1 ${isTotalMin ? 'bg-green-100' : ''}`}>{item.totalPrices[i]}</td>
-                      </React.Fragment>
-                    );
-                  })}
-                  <td className="px-2 py-1">{item.bestCompany}</td>
+        <>
+          <div className="table-container">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-2 py-2">Ürün</th>
+                  <th className="px-2 py-2">Açıklama</th>
+                  <th className="px-2 py-2">Adet</th>
+                  {companies.map((company, index) => (
+                    <React.Fragment key={`${company}-head`}>
+                      <th className="px-2 py-2">{company} (TL)</th>
+                      <th className="px-2 py-2">Fark %</th>
+                      <th className="px-2 py-2">Toplam (TL)</th>
+                    </React.Fragment>
+                  ))}
+                  <th className="px-2 py-2">En Uygun</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {getTableData().map((item, index) => (
+                  <tr
+                    key={index}
+                    className="hover:bg-gray-100 cursor-pointer"
+                    onClick={() => setSelectedItem(item.name)}
+                  >
+                    <td className="px-2 py-1">{item.name}</td>
+                    <td className="px-2 py-1">{item.description}</td>
+                    <td className="px-2 py-1">{item.quantity}</td>
+                    {companies.map((company, i) => {
+                      const isMin = item.differences[i] === '0%';
+                      const isTotalMin = item.totalDifferences[i] === '0%';
+                      return (
+                        <React.Fragment key={`${item.name}-${company}`}>
+                          <td className={`px-2 py-1 ${isMin ? 'bg-green-100' : ''}`}>{item.prices[i]}</td>
+                          <td className={`px-2 py-1 ${isMin ? 'bg-green-100' : ''}`}>{item.differences[i]}</td>
+                          <td className={`px-2 py-1 ${isTotalMin ? 'bg-green-100' : ''}`}>{item.totalPrices[i]}</td>
+                        </React.Fragment>
+                      );
+                    })}
+                    <td className="px-2 py-1">{item.bestCompany}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {selectedItem && renderItemDetailPanel()}
+        </>
       )}
 
       {activeTab === 'summary' && (
